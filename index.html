@@ -127,11 +127,11 @@ async function pump() {
   if (busy) return; busy = true;
   while (queue.length) {
     const k = queue.shift();
-    for (let a = 0; a < 3; a++) {
+    for (let a = 0; a < 5; a++) {
       try { const r = await fetch(`${API}/hit/${NS}/${k}`, {keepalive: true}); if (r.status !== 429) break; } catch (e) { break; }
       await new Promise(r => setTimeout(r, 1500 * (a + 1)));
     }
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => setTimeout(r, 400));
   }
   busy = false;
 }
