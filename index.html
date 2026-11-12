@@ -138,6 +138,14 @@ async function pump() {
 const hit = k => { if (ME) return; queue.push(k); pump(); };
 const get = k => fetch(`${API}/get/${NS}/${k}`).then(r => r.ok ? r.json() : {value: 0}).then(j => j.value || 0).catch(() => 0);
 hit('visit'); hit('visit-' + src);
+// Unique browsers: a local flag marks a browser that has been here before. Only coarse buckets leave the page.
+let seenBefore = false; try { seenBefore = localStorage.getItem('le-seen') === '1'; localStorage.setItem('le-seen', '1'); } catch (e) {}
+if (!seenBefore) {
+  hit('uniq'); hit('uniq-' + src);
+  hit('dev-' + (matchMedia('(pointer: coarse)').matches ? 'phone' : 'desktop'));
+  let region = 'other'; try { region = (Intl.DateTimeFormat().resolvedOptions().timeZone || 'other').split('/')[0].toLowerCase().replace(/[^a-z]/g, ''); } catch (e) {}
+  hit('reg-' + region);
+}
 // First touch or click anywhere: tells real people apart from link-preview bots that only load the page.
 addEventListener('pointerdown', () => hit('touch'), {once: true});
 
