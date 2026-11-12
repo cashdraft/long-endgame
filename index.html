@@ -114,7 +114,11 @@ const VIDEO = 'https://www.youtube.com/watch?v=U2nG5Qmd2j8';
 const MIN_STAT = 50;
 
 // --- anonymous counters (no cookies, no personal data) ---
-const NS = location.hostname.endsWith('github.io') ? 'longendgame-ep01' : 'longendgame-test';
+const NS = location.hostname.endsWith('github.io') ? 'longendgame-ep01-v2' : 'longendgame-test';
+// Owner's devices: open once with ?me=1 and this browser stops counting (?me=0 turns it back on).
+const meParam = new URLSearchParams(location.search).get('me');
+try { if (meParam === '1') localStorage.setItem('le-me', '1'); if (meParam === '0') localStorage.removeItem('le-me'); } catch (e) {}
+let ME = false; try { ME = localStorage.getItem('le-me') === '1'; } catch (e) {}
 const API = 'https://abacus.jasoncameron.dev';
 const src = (new URLSearchParams(location.search).get('s') || 'direct').replace(/[^a-z0-9]/gi, '').slice(0, 12);
 // Hits go out one by one with a retry, so a burst of clicks does not trip the counter's rate limit.
@@ -131,7 +135,7 @@ async function pump() {
   }
   busy = false;
 }
-const hit = k => { queue.push(k); pump(); };
+const hit = k => { if (ME) return; queue.push(k); pump(); };
 const get = k => fetch(`${API}/get/${NS}/${k}`).then(r => r.ok ? r.json() : {value: 0}).then(j => j.value || 0).catch(() => 0);
 hit('visit'); hit('visit-' + src);
 
