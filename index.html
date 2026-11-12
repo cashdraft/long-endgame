@@ -138,6 +138,8 @@ async function pump() {
 const hit = k => { if (ME) return; queue.push(k); pump(); };
 const get = k => fetch(`${API}/get/${NS}/${k}`).then(r => r.ok ? r.json() : {value: 0}).then(j => j.value || 0).catch(() => 0);
 hit('visit'); hit('visit-' + src);
+// First touch or click anywhere: tells real people apart from link-preview bots that only load the page.
+addEventListener('pointerdown', () => hit('touch'), {once: true});
 
 const $ = id => document.getElementById(id);
 let idx = 0, solved = [], tries = 0, hinted = false, started = false, done = false, cg, chess, puz;
