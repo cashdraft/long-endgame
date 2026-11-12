@@ -41,7 +41,7 @@ h2{font-size:24px;line-height:1.1;margin:4px 0 8px}
 .stat{margin-top:8px;font-family:Oswald,sans-serif;text-transform:uppercase;letter-spacing:.06em;font-size:14px;color:var(--gold)}
 .progress{display:flex;gap:6px;margin:12px 0 0}
 .progress i{flex:1;height:5px;border-radius:3px;background:var(--line)}
-.progress i.on{background:var(--gold)} .progress i.win{background:var(--ok)} .progress i.miss{background:var(--red)}
+.progress i.on{background:var(--gold)} .progress i.half{background:#e2c044} .progress i.win{background:var(--ok)} .progress i.miss{background:var(--red)}
 .sub{font-size:13px;color:var(--mute);margin-top:6px;font-family:Oswald,sans-serif;text-transform:uppercase;letter-spacing:.08em}
 .score{font-size:56px;color:var(--gold);line-height:1}
 .grid{font-size:28px;letter-spacing:4px;margin:8px 0}
@@ -140,7 +140,7 @@ const get = k => fetch(`${API}/get/${NS}/${k}`).then(r => r.ok ? r.json() : {val
 hit('visit'); hit('visit-' + src);
 
 const $ = id => document.getElementById(id);
-let idx = 0, solved = [], tries = 0, hinted = false, started = false, cg, chess, puz;
+let idx = 0, solved = [], tries = 0, hinted = false, started = false, done = false, cg, chess, puz;
 
 function dests(c) {
   const m = new Map();
@@ -150,12 +150,12 @@ function dests(c) {
 const colorOf = c => c.turn() === 'w' ? 'white' : 'black';
 
 function renderProgress() {
-  $('prog').innerHTML = PUZZLES.map((_, i) => `<i class="${i < solved.length ? (solved[i] ? 'win' : 'miss') : (i === idx ? 'on' : '')}"></i>`).join('');
+  $('prog').innerHTML = PUZZLES.map((_, i) => `<i class="${i < solved.length ? {g: 'win', y: 'half', r: 'miss'}[solved[i]] : (i === idx ? 'on' : '')}"></i>`).join('');
   $('pCount').textContent = `Position ${idx + 1} of ${PUZZLES.length} · solve 3 to unlock opponent #6`;
 }
 
 function load(i) {
-  idx = i; tries = 0; hinted = false; puz = PUZZLES[i];
+  idx = i; tries = 0; hinted = false; done = false; puz = PUZZLES[i];
   chess = new Chess(puz.fen);
   hit(`p${i + 1}-seen`);
   $('pRank').textContent = puz.rank;
@@ -171,11 +171,22 @@ function load(i) {
     fen: puz.fen, orientation: colorOf(chess), turnColor: colorOf(chess),
     lastMove: puz.last || undefined, coordinates: true,
     movable: {free: false, color: colorOf(chess), dests: dests(chess), showDests: true, events: {after: onMove}},
-    premovable: {enabled: false}, draggable: {enabled: true}, highlight: {lastMove: true, check: true}
+    premovable: {enabled: false}, draggable: {enabled: true}, highlight: {lastMove: true, check: true},
+    events: {select: onSelect}
   };
   if (cg) cg.set(cfg); else cg = Chessground($('board'), cfg);
   cg.setAutoShapes([]);
 }
+
+// Explain taps on pieces that cannot move, so the board never feels broken.
+function onSelect(sq) {
+  if (done) return;
+  const p = chess.get(sq);
+  if (!p) return;
+  if (p.color !== chess.turn()) { say(`That's Kasparov's piece. You play ${chess.turn() === "w" ? "White" : "Black"}.`); return; }
+  if (!chess.moves({square: sq}).length) say('This piece has no legal moves here. Try another one.');
+}
+function say(t) { $('msg').className = 'msg'; $('msg').textContent = t; }
 
 function onMove(from, to) {
   if (!started) { started = true; hit('start'); }
@@ -187,7 +198,7 @@ function onMove(from, to) {
     cg.set({fen: chess.fen(), movable: {color: undefined, dests: new Map()}, lastMove: [from, to]});
     $('msg').className = 'msg ok'; $('msg').textContent = puz.win;
     const clean = tries === 0 && !hinted;
-    solved.push(true); hit(`p${idx + 1}-solved`); if (clean) hit(`p${idx + 1}-first`);
+    done = true; solved.push(clean ? 'g' : 'y'); hit(`p${idx + 1}-solved`); if (clean) hit(`p${idx + 1}-first`);
     finishStep();
   } else {
     tries++;
@@ -204,7 +215,7 @@ $('hint').onclick = () => {
   cg.setAutoShapes([{orig: m.from, dest: m.to, brush: 'green'}]);
   $('msg').className = 'msg'; $('msg').textContent = puz.win;
   cg.set({movable: {color: undefined, dests: new Map()}});
-  solved.push(false); hit(`p${idx + 1}-shown`);
+  done = true; solved.push('r'); hit(`p${idx + 1}-shown`);
   finishStep();
 };
 
@@ -224,10 +235,10 @@ function finishStep() {
 }
 $('next').onclick = () => { if (idx < PUZZLES.length - 1) { load(idx + 1); window.scrollTo({top: 0, behavior: 'smooth'}); } else showResult(); };
 
-const n = () => solved.filter(Boolean).length;
-const grid = () => solved.map(s => s ? '🟩' : '🟥').join('');
+const n = () => solved.filter(s => s !== 'r').length;
+const grid = () => solved.map(s => ({g: '🟩', y: '🟨', r: '🟥'})[s]).join('');
 function scoreText() {
-  const miss = PUZZLES.filter((_, i) => !solved[i]).map(p => p.short);
+  const miss = PUZZLES.filter((_, i) => solved[i] === 'r').map(p => p.short);
   const tail = miss.length === 0 ? 'went 5/5' : miss.length === 1 ? `${miss[0]}'s move got me` : miss.length === 2 ? `${miss[0]} and ${miss[1]} got me` : 'he would have crushed me';
   return `Broke Kasparov ${n()}/5 ♟ ${grid()} · ${tail}`;
 }
